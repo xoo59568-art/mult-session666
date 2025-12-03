@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
  "scripts": {
-  "start": "pm2 start ecosystem.config.cjs --no-daemon",
+  "start": "pm2 start index.js --deep-monitoring --attach --name x-kira",
   "restart": "pm2 restart x-kira",
   "stop": "pm2 stop x-kira",
   "delete": "pm2 delete x-kira"
