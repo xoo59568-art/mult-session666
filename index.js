@@ -158,7 +158,7 @@ const PORT = process.env.PORT || 3000;
 
     app.listen(PORT, async () => {
       console.log(`Server listening on ${PORT}`);
-     eventlogger()
+   //  eventlogger()
       // start all sessions that were registered in meta (staggered by SessionManager)
       try {
         await manager.startAll();

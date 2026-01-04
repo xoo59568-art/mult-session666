@@ -4,7 +4,9 @@ import config from '../config.js';
 import { getTheme } from '../Themes/themes.js';
 import axios from 'axios';
 // static baileys helpers (static import as requested)
-import { jidNormalizedUser, copyNForward as baileysCopyNForward } from 'baileys';
+import { jidNormalizedUser } from 'baileys';
+// some baileys releases don't export `copyNForward` — use runtime fallback
+let baileysCopyNForward = null;
 
 const theme = getTheme();
 
