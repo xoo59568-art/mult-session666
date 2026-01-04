@@ -12,18 +12,19 @@ Module({
     return message.send("❌ Only bot owner can use this command.");
   if (!message.isGroup)
     return message.send("❌ This command works only in groups.");
-
+await message.loadGroupInfo();
   // normalize bot JID/number
   const botJid = (message.conn?.user?.id && String(message.conn.user.id)) || "";
   const botNumber = botJid ? String(botJid).split("@")[0] : "unknown";
-
+console.log("isBotAdmin", message.isBotAdmin);
+console.log("isAdmin", message.isAdmin);
   // If bot is not admin, send a fast notice asking to promote the bot and exit
   if (!message.isBotAdmin) {
     try {
       // Mention the bot in the message so group members see whom to promote
       const mention = botJid ? [botJid] : [];
       return message.send(
-        "⚠️ I need admin privileges to change anti-link settings. Please promote the bot to admin and retry.",
+        "⚠️ I need admin.",
         { mentions: mention }
       );
     } catch (e) {

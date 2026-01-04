@@ -158,7 +158,7 @@ const PORT = process.env.PORT || 3000;
 
     app.listen(PORT, async () => {
       console.log(`Server listening on ${PORT}`);
-   //  eventlogger()
+    eventlogger()
       // start all sessions that were registered in meta (staggered by SessionManager)
       try {
         await manager.startAll();
@@ -174,7 +174,7 @@ const PORT = process.env.PORT || 3000;
         console.error("Failed to preload plugins:", err?.message || err);
       }
       try {
-        initializeTelegramBot(manager);
+     //   initializeTelegramBot(manager);
       } catch (e) {
         console.warn("bot err", e?.message || e);
       }
