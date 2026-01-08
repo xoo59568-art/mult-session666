@@ -15,7 +15,7 @@ Module({
     },
     message: {
       contactMessage: {
-        displayName: "𝐒uɱꪸ๏η 𝐃ɛ̚𝐯'ʬ 合",
+        displayName: "𝑴𝒓 𝑹𝒂𝒃𝒃𝒊𝒕'ʬ 合",
         vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:'DEMON'\nitem1.TEL;waid=${
           message.conn.user.id.split("@")[0]
         }:${
