@@ -1,37 +1,25 @@
-import { Module } from '../lib/plugins.js';
-import config from '../config.js';
-import { getTheme } from '../Themes/themes.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import axios from 'axios';
 import FormData from 'form-data';
-const theme = getTheme();
+import { Module } from '../lib/plugins.js';
 
-// ==================== URL UPLOADER PLUGIN ====================
+// ==================== LINK-ONLY UPLOADER ====================
 
 Module({
   command: "url",
   package: "converter",
-  description: "Convert media to URL (upload to Catbox)",
+  description: "Convert media to URL (upload to Rabbit server)",
 })(async (message) => {
   try {
-    // Check if there's a quoted message or current message has media
     const quotedMsg = message.quoted || message;
     const mimeType = quotedMsg.content?.mimetype || quotedMsg.type;
 
     if (!mimeType) {
-      return message.send(
-        "_Reply to an image, video, audio, or document_\n\n" +
-          "*Supported:*\n" +
-          "• Images (JPG, PNG, GIF)\n" +
-          "• Videos (MP4, MKV)\n" +
-          "• Audio (MP3, WAV)\n" +
-          "• Documents"
-      );
+      return message.send("_Reply to a media file (image, video, audio, document, sticker)_");
     }
 
-    // Check if it's a supported media type
     const supportedTypes = [
       "imageMessage",
       "videoMessage",
@@ -41,174 +29,65 @@ Module({
     ];
 
     if (!supportedTypes.includes(quotedMsg.type)) {
-      return message.send(
-        "❌ _Unsupported media type. Reply to image, video, audio, or document_"
-      );
+      return message.send("❌ _Unsupported media type_");
     }
 
-    await message.react("⏳");
-    await message.send("_Uploading to Catbox... Please wait_");
+    // Download media
+    const mediaBuffer = await quotedMsg.download();
+    if (!mediaBuffer || mediaBuffer.length === 0) throw new Error("Failed to download media");
 
-    try {
-      // Download the media
-      const mediaBuffer = await quotedMsg.download();
+    // Create temp file
+    const tempFilePath = path.join(os.tmpdir(), `rabbit_upload_${Date.now()}`);
+    fs.writeFileSync(tempFilePath, mediaBuffer);
 
-      if (!mediaBuffer || mediaBuffer.length === 0) {
-        throw new Error("Failed to download media");
-      }
+    // Determine extension
+    let extension = ".bin";
+    const mime = quotedMsg.content?.mimetype || "";
 
-      // Create temporary file
-      const tempFilePath = path.join(
-        os.tmpdir(),
-        `catbox_upload_${Date.now()}`
-      );
-      fs.writeFileSync(tempFilePath, mediaBuffer);
+    if (mime.includes("image/jpeg") || quotedMsg.type === "imageMessage") extension = ".jpg";
+    else if (mime.includes("image/png")) extension = ".png";
+    else if (mime.includes("image/gif")) extension = ".gif";
+    else if (mime.includes("image/webp") || quotedMsg.type === "stickerMessage") extension = ".webp";
+    else if (mime.includes("video/mp4") || quotedMsg.type === "videoMessage") extension = ".mp4";
+    else if (mime.includes("video/mkv")) extension = ".mkv";
+    else if (mime.includes("audio/mpeg") || quotedMsg.type === "audioMessage") extension = ".mp3";
+    else if (mime.includes("audio/wav")) extension = ".wav";
+    else if (mime.includes("audio/ogg")) extension = ".ogg";
+    else if (quotedMsg.content?.fileName) extension = path.extname(quotedMsg.content.fileName) || ".bin";
 
-      // Determine file extension
-      let extension = "";
-      const mime = quotedMsg.content?.mimetype || "";
+    const fileName = `file_${Date.now()}${extension}`;
 
-      if (mime.includes("image/jpeg") || quotedMsg.type === "imageMessage") {
-        extension = ".jpg";
-      } else if (mime.includes("image/png")) {
-        extension = ".png";
-      } else if (mime.includes("image/gif")) {
-        extension = ".gif";
-      } else if (
-        mime.includes("image/webp") ||
-        quotedMsg.type === "stickerMessage"
-      ) {
-        extension = ".webp";
-      } else if (
-        mime.includes("video/mp4") ||
-        quotedMsg.type === "videoMessage"
-      ) {
-        extension = ".mp4";
-      } else if (mime.includes("video/mkv")) {
-        extension = ".mkv";
-      } else if (
-        mime.includes("audio/mpeg") ||
-        quotedMsg.type === "audioMessage"
-      ) {
-        extension = ".mp3";
-      } else if (mime.includes("audio/wav")) {
-        extension = ".wav";
-      } else if (mime.includes("audio/ogg")) {
-        extension = ".ogg";
-      } else if (quotedMsg.content?.fileName) {
-        const originalExt = path.extname(quotedMsg.content.fileName);
-        extension = originalExt || ".bin";
-      } else {
-        extension = ".bin";
-      }
+    // FormData for upload
+    const form = new FormData();
+    form.append("fileToUpload", fs.createReadStream(tempFilePath), fileName);
+    form.append("reqtype", "fileupload");
 
-      const fileName = `file_${Date.now()}${extension}`;
+    // Upload to Catbox
+    const response = await axios.post("https://catbox.moe/user/api.php", form, {
+      headers: { ...form.getHeaders() },
+      timeout: 30000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
 
-      // Prepare form data for Catbox
-      const form = new FormData();
-      form.append("fileToUpload", fs.createReadStream(tempFilePath), fileName);
-      form.append("reqtype", "fileupload");
+    // Remove temp file
+    fs.unlinkSync(tempFilePath);
 
-      // Upload to Catbox
-      const response = await axios.post(
-        "https://catbox.moe/user/api.php",
-        form,
-        {
-          headers: {
-            ...form.getHeaders(),
-          },
-          timeout: 30000, // 30 seconds timeout
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        }
-      );
-
-      // Clean up temp file
-      fs.unlinkSync(tempFilePath);
-
-      if (!response.data || response.data.includes("error")) {
-        throw new Error("Upload failed: " + (response.data || "Unknown error"));
-      }
-
-      const mediaUrl = response.data.trim();
-
-      // Determine media type for display
-      let mediaType = "File";
-      if (quotedMsg.type === "imageMessage" || mime.includes("image")) {
-        mediaType = "Image";
-      } else if (quotedMsg.type === "videoMessage" || mime.includes("video")) {
-        mediaType = "Video";
-      } else if (quotedMsg.type === "audioMessage" || mime.includes("audio")) {
-        mediaType = "Audio";
-      } else if (quotedMsg.type === "documentMessage") {
-        mediaType = "Document";
-      } else if (quotedMsg.type === "stickerMessage") {
-        mediaType = "Sticker";
-      }
-
-      // Format file size
-      const fileSize = formatBytes(mediaBuffer.length);
-
-      // Send success message
-      const resultMessage = `
-╭━━━「 *UPLOAD SUCCESS* 」━━━┈⊷
-┃
-┃ ✅ *${mediaType} uploaded successfully*
-┃
-┃ *📊 Details:*
-┃ • Type: ${mediaType}
-┃ • Size: ${fileSize}
-┃ • Format: ${extension.replace(".", "").toUpperCase()}
-┃
-┃ *🔗 URL:*
-┃ ${mediaUrl}
-┃
-┃ _Link is permanent and can be shared_
-┃
-╰━━━━━━━━━━━━━━━━━━━┈⊷
-      `.trim();
-
-      await message.sendreply(resultMessage);
-      await message.react("✅");
-    } catch (uploadError) {
-      console.error("Upload error:", uploadError);
-
-      let errorMessage = "❌ *Upload Failed*\n\n";
-
-      if (uploadError.code === "ETIMEDOUT") {
-        errorMessage += "_Timeout: Catbox server is not responding_\n";
-        errorMessage += "_Please try again later or check your connection_";
-      } else if (uploadError.code === "ECONNABORTED") {
-        errorMessage += "_Connection aborted_\n";
-        errorMessage += "_File may be too large or connection issue_";
-      } else if (uploadError.response?.status === 413) {
-        errorMessage += "_File too large for upload_\n";
-        errorMessage += "_Maximum size: 200MB_";
-      } else {
-        errorMessage += `_${
-          uploadError.message || "Unknown error occurred"
-        }_\n`;
-        errorMessage += "_Please try again later_";
-      }
-
-      await message.send(errorMessage);
-      await message.react("❌");
+    if (!response.data || response.data.includes("error")) {
+      throw new Error("Upload failed: " + (response.data || "Unknown error"));
     }
+
+    // Replace Catbox domain with Rabbit domain
+    const rabbitLink = response.data.trim().replace("files.catbox.moe", "www.rabbit.zone.id");
+
+    // Send only the link
+    await message.send(rabbitLink);
+
   } catch (error) {
     console.error("URL command error:", error);
-    await message.react("❌");
-    await message.send(
-      "❌ _Failed to process media. Make sure you replied to a valid media message_"
-    );
+    await message.send("❌ _Upload Failed: " + (error.message || "Unknown error") + "_");
   }
-});
-
-// ==================== ALTERNATIVE UPLOADERS ====================
-
-Module({
-  command: "telegraph",
-  package: "converter",
-  description: "Upload image to Telegraph",
+});  description: "Upload image to Telegraph",
 })(async (message) => {
   try {
     const quotedMsg = message.quoted || message;
