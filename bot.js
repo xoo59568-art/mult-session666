@@ -25,12 +25,8 @@ export default async function initializeTelegramBot(manager) {
   // === CONFIG ===
 
 const ALLOWED_GROUP_IDS = [
-  -5120090744,
-  -1002270479071,
- --5120090744
-  // future এ চাইলে নিচে শুধু ID add করলেই হবে
-  // -1002222333344,
-  // -1003333444455,
+  -1003616233972,
+  -1001234567890,
 ];
 
  
